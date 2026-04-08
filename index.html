@@ -356,13 +356,20 @@ function renderChart(){
         if(!elements.length) return;
         var idx=elements[0].index;
         var clickedLabel=labels[idx];
-        if(!isPie){
+        if(isPie){
+          chartInstance.data.datasets[0].offset=labels.map(function(l,i){return i===idx?18:0;});
+          chartInstance.update();
+          setTimeout(function(){doDrill(clickedLabel);},320);
+        } else {
           chartInstance.data.datasets[0].backgroundColor=labels.map(function(l,i){
-            return i===idx?currentColor:hexAlpha(currentColor,0.25);
+            return i===idx?currentColor:hexAlpha(currentColor,0.2);
           });
-          chartInstance.update('none');
+          chartInstance.data.datasets[0].borderColor=labels.map(function(l,i){
+            return i===idx?currentColor:hexAlpha(currentColor,0.2);
+          });
+          chartInstance.update();
+          setTimeout(function(){doDrill(clickedLabel);},320);
         }
-        doDrill(clickedLabel);
       }:null
     }
   });
