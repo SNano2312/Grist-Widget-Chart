@@ -1,356 +1,550 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Graphique personnalisé</title>
-  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --bg: #ffffff; --bg2: #f7f7f5; --text: #1a1a18; --text2: #6b6b67; --text3: #9b9b96;
-      --border: rgba(0,0,0,0.12); --border2: rgba(0,0,0,0.22);
-      --radius: 8px; --radius-lg: 12px;
-      --blue: #3266ad; --blue-bg: #e6f1fb; --blue-text: #0c447c;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #1e1e1c; --bg2: #2a2a28; --text: #f0efe8; --text2: #a8a8a3; --text3: #6b6b67;
-        --border: rgba(255,255,255,0.12); --border2: rgba(255,255,255,0.22);
-        --blue-bg: #0c2a4a; --blue-text: #85b7eb;
-      }
-    }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; color: var(--text); background: var(--bg); padding: 12px; min-height: 100vh; }
-    .layout { display: flex; flex-direction: column; gap: 10px; }
-    .panel { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px; }
-    .panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-    .panel-title { font-size: 13px; font-weight: 500; color: var(--text); }
-    .badge { font-size: 11px; padding: 3px 8px; border-radius: 20px; background: var(--blue-bg); color: var(--blue-text); font-weight: 500; }
-    .section-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
-    .chart-type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-    .chart-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 10px 6px; border: 0.5px solid var(--border); border-radius: var(--radius); background: var(--bg2); cursor: pointer; font-size: 12px; color: var(--text2); transition: all 0.12s; font-family: inherit; }
-    .chart-btn:hover { border-color: var(--border2); color: var(--text); }
-    .chart-btn.active { border: 1.5px solid var(--blue); color: var(--blue); background: var(--blue-bg); }
-    .chart-btn svg { width: 26px; height: 26px; }
-    .divider { border: none; border-top: 0.5px solid var(--border); margin: 12px 0; }
-    .axis-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .axis-col { display: flex; flex-direction: column; gap: 6px; }
-    select { width: 100%; padding: 7px 10px; font-size: 13px; border: 0.5px solid var(--border); border-radius: var(--radius); background: var(--bg2); color: var(--text); cursor: pointer; font-family: inherit; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; padding-right: 28px; }
-    select:hover { border-color: var(--border2); }
-    select:focus { outline: none; border-color: var(--blue); }
-    .color-row { display: flex; gap: 7px; flex-wrap: wrap; }
-    .color-swatch { width: 20px; height: 20px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: transform 0.1s; }
-    .color-swatch:hover { transform: scale(1.2); }
-    .color-swatch.selected { border-color: var(--text); }
-    .chart-wrapper { position: relative; width: 100%; height: 280px; }
-    .status-bar { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text3); min-height: 20px; }
-    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text3); flex-shrink: 0; }
-    .dot.live { background: #1d9e75; }
-    .dot.error { background: #e24b4a; }
-    .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 260px; gap: 8px; color: var(--text3); font-size: 13px; text-align: center; }
-    .drill-bar { display: flex; align-items: center; gap: 10px; padding: 7px 10px; margin-bottom: 10px; background: var(--blue-bg); border-radius: var(--radius); font-size: 12px; color: var(--blue-text); }
-    .drill-bar .breadcrumb { display: flex; align-items: center; gap: 6px; flex: 1; }
-    .drill-bar .crumb { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
-    .drill-bar .crumb:hover { opacity: 0.7; }
-    .back-btn { display: flex; align-items: center; gap: 5px; padding: 4px 10px; border: 0.5px solid var(--blue); border-radius: 20px; background: transparent; color: var(--blue-text); cursor: pointer; font-size: 11px; font-family: inherit; transition: all 0.12s; }
-    .back-btn:hover { background: rgba(50,102,173,0.1); }
-    .drill-hint { font-size: 11px; color: var(--text3); text-align: center; padding: 6px 0 2px; display: flex; align-items: center; justify-content: center; gap: 5px; }
-    .selected-info { font-size: 11px; padding: 4px 10px; border-radius: 20px; background: #e1f5ee; color: #085041; display: inline-flex; align-items: center; gap: 5px; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Graphique personnalisé</title>
+<script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#ffffff;--bg2:#f7f7f5;--bg3:#efefec;
+  --text:#1a1a18;--text2:#6b6b67;--text3:#9b9b96;
+  --border:rgba(0,0,0,0.12);--border2:rgba(0,0,0,0.25);
+  --radius:8px;--radius-lg:12px;
+  --blue:#3266ad;--blue-bg:#e6f1fb;--blue-text:#0c447c;
+  --green-bg:#e1f5ee;--green-text:#085041;
+  --red-bg:#fcebeb;--red-text:#791f1f;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#1e1e1c;--bg2:#2a2a28;--bg3:#323230;
+    --text:#f0efe8;--text2:#a8a8a3;--text3:#6b6b67;
+    --border:rgba(255,255,255,0.12);--border2:rgba(255,255,255,0.25);
+    --blue-bg:#0c2a4a;--blue-text:#85b7eb;
+    --green-bg:#04342c;--green-text:#9fe1cb;
+    --red-bg:#501313;--red-text:#f09595;
+  }
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:var(--text);background:var(--bg);padding:12px;min-height:100vh;}
+.layout{display:flex;flex-direction:column;gap:10px;}
+.panel{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;}
+.panel-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.panel-title{font-size:13px;font-weight:500;color:var(--text);}
+.badge{font-size:11px;padding:3px 8px;border-radius:20px;background:var(--blue-bg);color:var(--blue-text);font-weight:500;}
+.section-label{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px;}
+.chart-type-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.chart-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:10px 6px;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--bg2);cursor:pointer;font-size:12px;color:var(--text2);transition:all .12s;font-family:inherit;}
+.chart-btn:hover{border-color:var(--border2);color:var(--text);}
+.chart-btn.active{border:1.5px solid var(--blue);color:var(--blue);background:var(--blue-bg);}
+.chart-btn svg{width:26px;height:26px;}
+.divider{border:none;border-top:0.5px solid var(--border);margin:12px 0;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.col{display:flex;flex-direction:column;gap:6px;}
+select,input[type=text]{width:100%;padding:7px 10px;font-size:13px;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--bg2);color:var(--text);cursor:pointer;font-family:inherit;}
+select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;padding-right:28px;}
+select:hover,input[type=text]:hover{border-color:var(--border2);}
+select:focus,input[type=text]:focus{outline:none;border-color:var(--blue);}
+input[type=text]::placeholder{color:var(--text3);}
+
+/* Toggle switch */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;color:var(--text2);}
+.toggle{position:relative;width:34px;height:20px;flex-shrink:0;}
+.toggle input{opacity:0;width:0;height:0;}
+.toggle-slider{position:absolute;inset:0;background:var(--bg3);border-radius:20px;cursor:pointer;transition:.2s;border:0.5px solid var(--border);}
+.toggle-slider::before{content:'';position:absolute;width:14px;height:14px;left:2px;top:2px;background:#fff;border-radius:50%;transition:.2s;}
+.toggle input:checked+.toggle-slider{background:var(--blue);}
+.toggle input:checked+.toggle-slider::before{transform:translateX(14px);}
+
+/* Multi-series */
+.series-list{display:flex;flex-direction:column;gap:6px;}
+.series-row{display:flex;align-items:center;gap:6px;}
+.series-row select{flex:1;}
+.series-color{width:22px;height:22px;border-radius:50%;border:2px solid var(--border);cursor:pointer;flex-shrink:0;}
+.series-del{width:22px;height:22px;border-radius:50%;border:0.5px solid var(--border);background:var(--bg2);cursor:pointer;font-size:14px;color:var(--text3);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit;line-height:1;}
+.series-del:hover{background:var(--red-bg);color:var(--red-text);border-color:transparent;}
+.add-series-btn{display:flex;align-items:center;gap:6px;padding:7px 10px;border:0.5px dashed var(--border2);border-radius:var(--radius);background:transparent;color:var(--text2);cursor:pointer;font-size:12px;font-family:inherit;width:100%;justify-content:center;transition:all .12s;}
+.add-series-btn:hover{background:var(--bg2);color:var(--text);}
+
+/* Color picker popup */
+.color-popup{display:none;position:absolute;z-index:99;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius);padding:8px;gap:6px;flex-wrap:wrap;width:148px;box-shadow:0 4px 12px rgba(0,0,0,.12);}
+.color-popup.open{display:flex;}
+.cp-swatch{width:20px;height:20px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform .1s;}
+.cp-swatch:hover{transform:scale(1.2);}
+.cp-swatch.sel{border-color:var(--text);}
+
+/* Chart area */
+.chart-wrapper{position:relative;width:100%;}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:240px;gap:8px;color:var(--text3);font-size:13px;text-align:center;}
+
+/* Drill */
+.drill-bar{display:flex;align-items:center;gap:8px;padding:7px 10px;margin-bottom:10px;background:var(--blue-bg);border-radius:var(--radius);font-size:12px;color:var(--blue-text);}
+.crumb{cursor:pointer;text-decoration:underline;text-underline-offset:2px;}
+.crumb:hover{opacity:.7;}
+.back-btn{display:flex;align-items:center;gap:4px;padding:3px 10px;border:0.5px solid var(--blue);border-radius:20px;background:transparent;color:var(--blue-text);cursor:pointer;font-size:11px;font-family:inherit;margin-left:auto;}
+.back-btn:hover{background:rgba(50,102,173,.1);}
+
+/* Bottom bar */
+.bottom-bar{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;}
+.drill-hint{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:4px;flex:1;}
+.export-btn{display:flex;align-items:center;gap:5px;padding:5px 12px;border:0.5px solid var(--border2);border-radius:20px;background:var(--bg2);color:var(--text2);cursor:pointer;font-size:12px;font-family:inherit;transition:all .12s;}
+.export-btn:hover{background:var(--bg3);color:var(--text);}
+.sel-badge{font-size:11px;padding:3px 10px;border-radius:20px;background:var(--green-bg);color:var(--green-text);}
+</style>
 </head>
 <body>
 <div class="layout">
 
-  <div class="panel">
-    <div class="panel-header">
-      <span class="panel-title">Graphique personnalisé</span>
-      <span class="badge" id="statusBadge">En attente</span>
+<!-- CONFIG PANEL -->
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-title">Configuration</span>
+    <span class="badge" id="statusBadge">En attente</span>
+  </div>
+
+  <div class="section-label">Type de graphique</div>
+  <div class="chart-type-grid">
+    <button class="chart-btn active" data-type="bar" onclick="setType('bar',this)">
+      <svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="11" width="5" height="11" rx="1" fill="currentColor" opacity=".2"/><rect x="10" y="6" width="5" height="16" rx="1" fill="currentColor" opacity=".2"/><rect x="18" y="14" width="5" height="8" rx="1" fill="currentColor" opacity=".2"/><line x1="1" y1="23" x2="25" y2="23" stroke-width="1.4"/></svg>
+      Histogramme
+    </button>
+    <button class="chart-btn" data-type="pie" onclick="setType('pie',this)">
+      <svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="13" cy="13" r="9" fill="currentColor" opacity=".1"/><path d="M13 13 L13 4 A9 9 0 0 1 21.8 17.5 Z" fill="currentColor" opacity=".4"/><path d="M13 13 L21.8 17.5 A9 9 0 0 1 4.5 18 Z" fill="currentColor" opacity=".25"/><circle cx="13" cy="13" r="9" fill="none"/></svg>
+      Camembert
+    </button>
+    <button class="chart-btn" data-type="line" onclick="setType('line',this)">
+      <svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="2,21 8,13 14,16 20,7 24,10" stroke="currentColor" stroke-linejoin="round"/><circle cx="2" cy="21" r="1.8" fill="currentColor"/><circle cx="8" cy="13" r="1.8" fill="currentColor"/><circle cx="14" cy="16" r="1.8" fill="currentColor"/><circle cx="20" cy="7" r="1.8" fill="currentColor"/><circle cx="24" cy="10" r="1.8" fill="currentColor"/><line x1="1" y1="23" x2="25" y2="23" stroke-width="1.4"/></svg>
+      Courbe
+    </button>
+  </div>
+
+  <hr class="divider">
+
+  <div class="row2">
+    <div class="col">
+      <div class="section-label">Axe X — catégories</div>
+      <select id="xAxis" onchange="resetDrill();saveOpts();renderChart()"><option value="">— Colonne —</option></select>
     </div>
-
-    <div class="section-label">Type de graphique</div>
-    <div class="chart-type-grid">
-      <button class="chart-btn active" data-type="bar" onclick="setType('bar',this)">
-        <svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.6">
-          <rect x="2" y="11" width="5" height="11" rx="1" fill="currentColor" opacity=".2"/>
-          <rect x="10" y="6" width="5" height="16" rx="1" fill="currentColor" opacity=".2"/>
-          <rect x="18" y="14" width="5" height="8" rx="1" fill="currentColor" opacity=".2"/>
-          <line x1="1" y1="23" x2="25" y2="23" stroke-width="1.4"/>
-        </svg>
-        Histogramme
-      </button>
-      <button class="chart-btn" data-type="pie" onclick="setType('pie',this)">
-        <svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.6">
-          <circle cx="13" cy="13" r="9" fill="currentColor" opacity=".1"/>
-          <path d="M13 13 L13 4 A9 9 0 0 1 21.8 17.5 Z" fill="currentColor" opacity=".4"/>
-          <path d="M13 13 L21.8 17.5 A9 9 0 0 1 4.5 18 Z" fill="currentColor" opacity=".25"/>
-          <circle cx="13" cy="13" r="9" fill="none"/>
-        </svg>
-        Camembert
-      </button>
-      <button class="chart-btn" data-type="line" onclick="setType('line',this)">
-        <svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.6">
-          <polyline points="2,21 8,13 14,16 20,7 24,10" stroke="currentColor" stroke-linejoin="round"/>
-          <circle cx="2" cy="21" r="1.8" fill="currentColor"/>
-          <circle cx="8" cy="13" r="1.8" fill="currentColor"/>
-          <circle cx="14" cy="16" r="1.8" fill="currentColor"/>
-          <circle cx="20" cy="7" r="1.8" fill="currentColor"/>
-          <circle cx="24" cy="10" r="1.8" fill="currentColor"/>
-          <line x1="1" y1="23" x2="25" y2="23" stroke-width="1.4"/>
-        </svg>
-        Courbe
-      </button>
-    </div>
-
-    <hr class="divider">
-
-    <div class="axis-row">
-      <div class="axis-col">
-        <div class="section-label">Axe X — catégories</div>
-        <select id="xAxis" onchange="resetDrill();renderChart()">
-          <option value="">— Choisir une colonne —</option>
-        </select>
-      </div>
-      <div class="axis-col">
-        <div class="section-label">Axe Y — valeurs</div>
-        <select id="yAxis" onchange="resetDrill();renderChart()">
-          <option value="">— Choisir une colonne —</option>
-        </select>
-      </div>
-    </div>
-
-    <hr class="divider">
-
-    <div class="section-label">Colonne drill down (détail au clic)</div>
-    <select id="drillAxis" onchange="resetDrill();renderChart()">
-      <option value="">— Aucun drill down —</option>
-    </select>
-
-    <hr class="divider">
-
-    <div class="section-label">Couleur principale</div>
-    <div class="color-row">
-      <div class="color-swatch selected" style="background:#3266ad" data-color="#3266ad" onclick="setColor(this)"></div>
-      <div class="color-swatch" style="background:#1d9e75" data-color="#1d9e75" onclick="setColor(this)"></div>
-      <div class="color-swatch" style="background:#d85a30" data-color="#d85a30" onclick="setColor(this)"></div>
-      <div class="color-swatch" style="background:#ba7517" data-color="#ba7517" onclick="setColor(this)"></div>
-      <div class="color-swatch" style="background:#d4537e" data-color="#d4537e" onclick="setColor(this)"></div>
-      <div class="color-swatch" style="background:#7f77dd" data-color="#7f77dd" onclick="setColor(this)"></div>
-      <div class="color-swatch" style="background:#73726c" data-color="#73726c" onclick="setColor(this)"></div>
+    <div class="col">
+      <div class="section-label">Titre du graphique</div>
+      <input type="text" id="chartTitleInput" placeholder="Mon graphique" oninput="saveOpts();renderChart()">
     </div>
   </div>
 
-  <div class="panel">
-    <div class="panel-header">
-      <span class="panel-title" id="chartTitle">Aperçu</span>
-      <div class="status-bar">
-        <span class="dot" id="statusDot"></span>
-        <span id="statusText">En attente de données…</span>
-      </div>
-    </div>
+  <hr class="divider">
 
-    <div id="drillBar" style="display:none" class="drill-bar">
-      <div class="breadcrumb">
-        <span class="crumb" onclick="resetDrill()">Vue globale</span>
-        <span style="opacity:.5">›</span>
-        <span id="drillCrumb" style="font-weight:500"></span>
-      </div>
-      <button class="back-btn" onclick="resetDrill()">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 2L3 6l4 4"/></svg>
-        Retour
-      </button>
-    </div>
+  <div class="section-label">Séries Y</div>
+  <div class="series-list" id="seriesList"></div>
+  <button class="add-series-btn" onclick="addSeries()" style="margin-top:6px">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg>
+    Ajouter une série
+  </button>
 
-    <div id="emptyState" class="empty-state">
-      <svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".3">
-        <rect x="4" y="20" width="7" height="14" rx="1"/>
-        <rect x="16" y="12" width="7" height="22" rx="1"/>
-        <rect x="28" y="26" width="7" height="8" rx="1"/>
-        <line x1="2" y1="36" x2="38" y2="36"/>
-      </svg>
-      <span>Sélectionnez les colonnes X et Y<br>pour afficher le graphique</span>
-    </div>
+  <hr class="divider">
 
-    <div class="chart-wrapper" id="chartWrapper" style="display:none">
-      <canvas id="chartCanvas" role="img" aria-label="Graphique Grist personnalisé"></canvas>
+  <div class="row2">
+    <div class="col">
+      <div class="section-label">Drill down (colonne détail)</div>
+      <select id="drillAxis" onchange="resetDrill();saveOpts();renderChart()"><option value="">— Aucun —</option></select>
     </div>
+    <div class="col">
+      <div class="section-label">Format des valeurs</div>
+      <select id="valFormat" onchange="saveOpts();renderChart()">
+        <option value="num">Nombre</option>
+        <option value="pct">Pourcentage (%)</option>
+        <option value="eur">Euros (€)</option>
+        <option value="usd">Dollars ($)</option>
+      </select>
+    </div>
+  </div>
 
-    <div id="drillHint" class="drill-hint" style="display:none">
+  <hr class="divider">
+
+  <div class="toggle-row">
+    <span>Étiquettes sur le graphique</span>
+    <label class="toggle"><input type="checkbox" id="showLabels" onchange="saveOpts();renderChart()"><span class="toggle-slider"></span></label>
+  </div>
+</div>
+
+<!-- CHART PANEL -->
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-title" id="chartDisplayTitle">Aperçu</span>
+    <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text3);">
+      <span class="dot" id="statusDot" style="width:7px;height:7px;border-radius:50%;background:var(--text3);flex-shrink:0;display:inline-block;"></span>
+      <span id="statusText">En attente…</span>
+    </div>
+  </div>
+
+  <div id="drillBar" style="display:none" class="drill-bar">
+    <div id="breadcrumb" style="display:flex;align-items:center;gap:6px;flex:1;flex-wrap:wrap;"></div>
+    <button class="back-btn" onclick="drillUp()">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 2L3 6l4 4"/></svg>
+      Retour
+    </button>
+  </div>
+
+  <div id="emptyState" class="empty-state">
+    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".3"><rect x="4" y="20" width="7" height="14" rx="1"/><rect x="16" y="12" width="7" height="22" rx="1"/><rect x="28" y="26" width="7" height="8" rx="1"/><line x1="2" y1="36" x2="38" y2="36"/></svg>
+    <span id="emptyMsg">Configurez les colonnes pour afficher le graphique</span>
+  </div>
+
+  <div class="chart-wrapper" id="chartWrapper" style="display:none">
+    <canvas id="chartCanvas" role="img" aria-label="Graphique Grist"></canvas>
+  </div>
+
+  <div class="bottom-bar">
+    <div class="drill-hint" id="drillHint" style="display:none">
       <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="6" cy="6" r="5"/><path d="M6 5v3M6 3.5v.5"/></svg>
-      Cliquez sur une barre ou tranche pour zoomer et sélectionner dans Grist
+      Cliquez pour zoomer et sélectionner dans Grist
     </div>
-
-    <div id="selectionInfo" style="display:none;margin-top:8px;text-align:center">
-      <span class="selected-info" id="selectionText"></span>
-    </div>
+    <span id="selBadge" class="sel-badge" style="display:none"></span>
+    <button class="export-btn" onclick="exportPNG()" title="Télécharger en PNG">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M7 2v7M4 6l3 3 3-3"/><path d="M2 10v2h10v-2"/></svg>
+      Exporter PNG
+    </button>
   </div>
+</div>
 
 </div>
+
+<!-- Color popup (shared) -->
+<div class="color-popup" id="colorPopup"></div>
+
 <script>
-var currentType='bar', currentColor='#3266ad', chartInstance=null, allRecords=[], columns=[], drillValue=null;
-var PIE_PALETTE=['#3266ad','#1d9e75','#d85a30','#ba7517','#d4537e','#7f77dd','#73726c','#378add','#639922'];
+var PALETTE=['#3266ad','#1d9e75','#d85a30','#ba7517','#d4537e','#7f77dd','#73726c','#378add','#639922','#e24b4a'];
+var currentType='bar';
+var chartInstance=null;
+var allRecords=[];
+var columns=[];
+var drillStack=[];
+var series=[{col:'',color:'#3266ad'}];
+var activePopupBtn=null;
+var _saving=false;
 
 function hexAlpha(hex,a){var r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return 'rgba('+r+','+g+','+b+','+a+')';}
 
+function fmtVal(v){
+  var f=document.getElementById('valFormat').value;
+  if(f==='pct') return parseFloat(v.toFixed(1))+'%';
+  if(f==='eur') return parseFloat(v.toFixed(2)).toLocaleString('fr-FR')+'€';
+  if(f==='usd') return '$'+parseFloat(v.toFixed(2)).toLocaleString('en-US');
+  return Number.isInteger(v)?v:parseFloat(v.toFixed(2));
+}
+
+/* ---- STATUS ---- */
 function setStatus(state,text){
   var dot=document.getElementById('statusDot'),badge=document.getElementById('statusBadge');
   document.getElementById('statusText').textContent=text;
-  dot.className='dot'+(state==='live'?' live':state==='error'?' error':'');
-  if(state==='live'){badge.textContent='Connecté';badge.style.background='#e1f5ee';badge.style.color='#085041';}
-  else if(state==='error'){badge.textContent='Erreur';badge.style.background='#fcebeb';badge.style.color='#791f1f';}
-  else{badge.textContent='En attente';badge.style.background='';badge.style.color='';}
+  dot.style.background=state==='live'?'#1d9e75':state==='error'?'#e24b4a':'var(--text3)';
+  if(state==='live'){badge.textContent='Connecté';badge.style.background='var(--green-bg)';badge.style.color='var(--green-text)';}
+  else if(state==='error'){badge.textContent='Erreur';badge.style.background='var(--red-bg)';badge.style.color='var(--red-text)';}
+  else{badge.textContent='En attente';badge.style.background='var(--blue-bg)';badge.style.color='var(--blue-text)';}
 }
 
+/* ---- TYPE ---- */
 function setType(type,btn){
   currentType=type;
   document.querySelectorAll('.chart-btn').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active');
   resetDrill();
+  saveOpts();
 }
 
-function setColor(el){
-  currentColor=el.dataset.color;
-  document.querySelectorAll('.color-swatch').forEach(function(s){s.classList.remove('selected');});
-  el.classList.add('selected');
-  if(!drillValue) renderChart(); else renderDrillChart(getDrillRecords(), document.getElementById('drillAxis').value);
+/* ---- SERIES ---- */
+function renderSeriesList(){
+  var list=document.getElementById('seriesList');
+  list.innerHTML='';
+  series.forEach(function(s,i){
+    var row=document.createElement('div');
+    row.className='series-row';
+
+    var sel=document.createElement('select');
+    sel.innerHTML='<option value="">— Colonne Y —</option>';
+    columns.forEach(function(c){
+      var o=document.createElement('option');
+      o.value=c.id;o.textContent=c.label||c.id;
+      if(c.id===s.col) o.selected=true;
+      sel.appendChild(o);
+    });
+    sel.onchange=function(){series[i].col=this.value;saveOpts();renderChart();};
+
+    var colorBtn=document.createElement('div');
+    colorBtn.className='series-color';
+    colorBtn.style.background=s.color;
+    colorBtn.title='Changer la couleur';
+    colorBtn.onclick=function(e){e.stopPropagation();openColorPopup(colorBtn,i);};
+
+    var del=document.createElement('button');
+    del.className='series-del';
+    del.innerHTML='&times;';
+    del.title='Supprimer';
+    del.onclick=function(){if(series.length>1){series.splice(i,1);renderSeriesList();saveOpts();renderChart();}};
+
+    row.appendChild(sel);row.appendChild(colorBtn);
+    if(series.length>1) row.appendChild(del);
+    list.appendChild(row);
+  });
 }
 
-function getDrillRecords(){
-  var xKey=document.getElementById('xAxis').value;
-  return allRecords.filter(function(r){return String(r[xKey])===String(drillValue);});
+function addSeries(){
+  var nextColor=PALETTE[series.length%PALETTE.length];
+  series.push({col:'',color:nextColor});
+  renderSeriesList();
+  saveOpts();
 }
 
+/* ---- COLOR POPUP ---- */
+function openColorPopup(btn,seriesIdx){
+  var popup=document.getElementById('colorPopup');
+  if(activePopupBtn===btn&&popup.classList.contains('open')){popup.classList.remove('open');activePopupBtn=null;return;}
+  activePopupBtn=btn;
+  popup.innerHTML='';
+  PALETTE.forEach(function(c){
+    var sw=document.createElement('div');
+    sw.className='cp-swatch'+(c===series[seriesIdx].color?' sel':'');
+    sw.style.background=c;
+    sw.onclick=function(){series[seriesIdx].color=c;btn.style.background=c;popup.classList.remove('open');activePopupBtn=null;saveOpts();renderChart();};
+    popup.appendChild(sw);
+  });
+  var rect=btn.getBoundingClientRect();
+  popup.style.top=(rect.bottom+window.scrollY+4)+'px';
+  popup.style.left=(rect.left+window.scrollX)+'px';
+  popup.classList.add('open');
+}
+document.addEventListener('click',function(e){
+  var popup=document.getElementById('colorPopup');
+  if(!popup.contains(e.target)&&e.target!==activePopupBtn){popup.classList.remove('open');activePopupBtn=null;}
+});
+
+/* ---- SELECTS ---- */
+function populateSelects(cols){
+  var xSel=document.getElementById('xAxis'),dSel=document.getElementById('drillAxis');
+  var xVal=xSel.value,dVal=dSel.value;
+  xSel.innerHTML='<option value="">— Colonne —</option>';
+  dSel.innerHTML='<option value="">— Aucun —</option>';
+  cols.forEach(function(c){
+    [xSel,dSel].forEach(function(sel){
+      var o=document.createElement('option');o.value=c.id;o.textContent=c.label||c.id;sel.appendChild(o);
+    });
+  });
+  if(xVal) xSel.value=xVal;
+  if(dVal) dSel.value=dVal;
+  renderSeriesList();
+}
+
+/* ---- DRILL ---- */
 function resetDrill(){
-  drillValue=null;
+  drillStack=[];
   document.getElementById('drillBar').style.display='none';
-  document.getElementById('selectionInfo').style.display='none';
-  document.getElementById('chartTitle').textContent='Aperçu';
+  document.getElementById('selBadge').style.display='none';
+  document.getElementById('chartDisplayTitle').textContent=document.getElementById('chartTitleInput').value||'Aperçu';
   try{grist.setSelectedRows([]);}catch(e){}
   renderChart();
+}
+
+function drillUp(){
+  if(drillStack.length<=1){resetDrill();return;}
+  drillStack.pop();
+  applyDrillStack();
 }
 
 function doDrill(label){
   var drillKey=document.getElementById('drillAxis').value;
   if(!drillKey) return;
-  drillValue=label;
-  var filtered=getDrillRecords();
-  document.getElementById('drillCrumb').textContent=label;
-  document.getElementById('drillBar').style.display='flex';
-  document.getElementById('chartTitle').textContent='Détail — '+label;
+  drillStack.push({label:label,key:drillKey});
+  applyDrillStack();
+}
+
+function applyDrillStack(){
+  if(!drillStack.length){resetDrill();return;}
+  var xKey=document.getElementById('xAxis').value;
+  var filtered=allRecords;
+  drillStack.forEach(function(level,i){
+    var key=i===0?xKey:drillStack[i-1].key;
+    filtered=filtered.filter(function(r){return String(r[key])===String(level.label);});
+  });
+
   var rowIds=filtered.map(function(r){return r.id;});
   try{grist.setSelectedRows(rowIds);}catch(e){}
   var n=rowIds.length;
-  document.getElementById('selectionText').textContent=n+' ligne'+(n>1?'s':'')+' sélectionnée'+(n>1?'s':'')+' dans Grist';
-  document.getElementById('selectionInfo').style.display='block';
+  var badge=document.getElementById('selBadge');
+  badge.textContent=n+' ligne'+(n>1?'s':'')+' sélectionnée'+(n>1?'s':'');
+  badge.style.display='inline-flex';
+
+  var lastLevel=drillStack[drillStack.length-1];
+  document.getElementById('chartDisplayTitle').textContent='Détail — '+lastLevel.label;
+  document.getElementById('drillBar').style.display='flex';
+  updateBreadcrumb();
+
+  var drillKey=document.getElementById('drillAxis').value;
   renderDrillChart(filtered, drillKey);
 }
 
-function renderDrillChart(filtered, drillKey){
-  var yKey=document.getElementById('yAxis').value;
+function updateBreadcrumb(){
+  var bc=document.getElementById('breadcrumb');
+  bc.innerHTML='';
+  var root=document.createElement('span');
+  root.className='crumb';root.textContent='Vue globale';
+  root.onclick=function(){drillStack=[];resetDrill();};
+  bc.appendChild(root);
+  drillStack.forEach(function(level,i){
+    var sep=document.createElement('span');sep.textContent=' › ';sep.style.opacity='.5';bc.appendChild(sep);
+    var crumb=document.createElement('span');
+    if(i<drillStack.length-1){
+      crumb.className='crumb';
+      crumb.onclick=(function(idx){return function(){drillStack=drillStack.slice(0,idx+1);applyDrillStack();};})(i);
+    } else {
+      crumb.style.fontWeight='500';
+    }
+    crumb.textContent=level.label;
+    bc.appendChild(crumb);
+  });
+}
+
+function getChartRecords(){
+  if(!drillStack.length) return allRecords;
+  var xKey=document.getElementById('xAxis').value;
+  var filtered=allRecords;
+  drillStack.forEach(function(level,i){
+    var key=i===0?xKey:drillStack[i-1].key;
+    filtered=filtered.filter(function(r){return String(r[key])===String(level.label);});
+  });
+  return filtered;
+}
+
+/* ---- RENDER DRILL CHART ---- */
+function renderDrillChart(filtered, groupKey){
   var isPie=currentType==='pie';
+  var showLbls=document.getElementById('showLabels').checked;
   var isDark=matchMedia('(prefers-color-scheme: dark)').matches;
   var gridColor=isDark?'rgba(255,255,255,0.07)':'rgba(0,0,0,0.06)';
   var labelColor=isDark?'#a8a8a3':'#6b6b67';
+
+  var activeSeries=series.filter(function(s){return s.col;});
+  if(!activeSeries.length) return;
+  var yKey=activeSeries[0].col;
+
   var groups={};
   filtered.forEach(function(r){
-    var k=String(r[drillKey]!==undefined?r[drillKey]:'(vide)');
+    var k=String(r[groupKey]!==undefined?r[groupKey]:'(vide)');
     groups[k]=(groups[k]||0)+(parseFloat(r[yKey])||0);
   });
   var labels=Object.keys(groups);
   var values=labels.map(function(k){return groups[k];});
+
   document.getElementById('emptyState').style.display='none';
   document.getElementById('chartWrapper').style.display='block';
   document.getElementById('drillHint').style.display='none';
   if(chartInstance){chartInstance.destroy();chartInstance=null;}
+
+  var color=activeSeries[0].color;
   var dataset=isPie
-    ?{data:values,backgroundColor:PIE_PALETTE.slice(0,labels.length),borderColor:isDark?'#1e1e1c':'#fff',borderWidth:2}
-    :{label:yKey,data:values,backgroundColor:hexAlpha(currentColor,0.75),borderColor:currentColor,borderWidth:1,borderRadius:4};
-  var ctx=document.getElementById('chartCanvas').getContext('2d');
-  chartInstance=new Chart(ctx,{
-    type:isPie?'pie':'bar',
-    data:{labels:labels,datasets:[dataset]},
-    options:{
-      responsive:true,maintainAspectRatio:false,animation:{duration:300},
-      plugins:{
-        legend:{display:isPie,position:'bottom',labels:{boxWidth:12,padding:14,font:{size:12},color:labelColor}},
-        tooltip:{callbacks:{label:function(c){var v=c.parsed.y!==undefined?c.parsed.y:c.parsed;return ' '+(Number.isInteger(v)?v:parseFloat(v.toFixed(2)));}}}
-      },
-      scales:isPie?{}:{
-        x:{grid:{color:gridColor},ticks:{color:labelColor,font:{size:12},maxRotation:35}},
-        y:{grid:{color:gridColor},ticks:{color:labelColor,font:{size:12},callback:function(v){return Number.isInteger(v)?v:parseFloat(v.toFixed(2));}}}
-      }
-    }
-  });
+    ?{data:values,backgroundColor:PALETTE.slice(0,labels.length),borderColor:isDark?'#1e1e1c':'#fff',borderWidth:2}
+    :{label:yKey,data:values,backgroundColor:hexAlpha(color,0.75),borderColor:color,borderWidth:1,borderRadius:4};
+
+  if(showLbls){
+    dataset.datalabels={display:true};
+  }
+
+  buildChart(isPie?'pie':'bar', labels, [dataset], gridColor, labelColor, showLbls, false);
 }
 
-function populateSelects(cols){
-  var xSel=document.getElementById('xAxis'),ySel=document.getElementById('yAxis'),dSel=document.getElementById('drillAxis');
-  var xVal=xSel.value,yVal=ySel.value,dVal=dSel.value;
-  xSel.innerHTML='<option value="">— Choisir une colonne —</option>';
-  ySel.innerHTML='<option value="">— Choisir une colonne —</option>';
-  dSel.innerHTML='<option value="">— Aucun drill down —</option>';
-  cols.forEach(function(col){
-    [xSel,ySel,dSel].forEach(function(sel){
-      var o=document.createElement('option');
-      o.value=col.id;o.textContent=col.label||col.id;sel.appendChild(o);
-    });
-  });
-  if(xVal)xSel.value=xVal;
-  if(yVal)ySel.value=yVal;
-  if(dVal)dSel.value=dVal;
-}
-
+/* ---- MAIN RENDER ---- */
 function showEmpty(msg){
   document.getElementById('emptyState').style.display='flex';
-  document.getElementById('emptyState').querySelector('span').innerHTML=msg.replace('\n','<br>');
+  document.getElementById('emptyMsg').innerHTML=msg.replace('\n','<br>');
   document.getElementById('chartWrapper').style.display='none';
   document.getElementById('drillHint').style.display='none';
   if(chartInstance){chartInstance.destroy();chartInstance=null;}
 }
 
 function renderChart(){
-  if(drillValue) return;
+  if(drillStack.length) return;
   var xKey=document.getElementById('xAxis').value;
-  var yKey=document.getElementById('yAxis').value;
   var drillKey=document.getElementById('drillAxis').value;
   var isPie=currentType==='pie';
+  var showLbls=document.getElementById('showLabels').checked;
+  var activeSeries=series.filter(function(s){return s.col;});
+
   if(!allRecords.length){showEmpty('Aucune donnée reçue de Grist…');return;}
-  if(!xKey||!yKey){showEmpty('Sélectionnez les colonnes X et Y\npour afficher le graphique');return;}
+  if(!xKey||!activeSeries.length){showEmpty('Configurez l\'axe X et au moins une série Y');return;}
+
   var labels=allRecords.map(function(r){return String(r[xKey]!==undefined?r[xKey]:'');});
-  var values=allRecords.map(function(r){return parseFloat(r[yKey])||0;});
   var hasDrill=!!drillKey&&(currentType==='bar'||currentType==='pie');
+
   document.getElementById('emptyState').style.display='none';
   document.getElementById('chartWrapper').style.display='block';
   document.getElementById('drillHint').style.display=hasDrill?'flex':'none';
+
   if(chartInstance){chartInstance.destroy();chartInstance=null;}
+
   var isDark=matchMedia('(prefers-color-scheme: dark)').matches;
   var gridColor=isDark?'rgba(255,255,255,0.07)':'rgba(0,0,0,0.06)';
   var labelColor=isDark?'#a8a8a3':'#6b6b67';
-  var dataset;
-  if(isPie){
-    dataset={data:values,backgroundColor:PIE_PALETTE.slice(0,labels.length),borderColor:isDark?'#1e1e1c':'#fff',borderWidth:2};
-  } else if(currentType==='line'){
-    dataset={label:yKey,data:values,borderColor:currentColor,backgroundColor:hexAlpha(currentColor,0.1),borderWidth:2,pointBackgroundColor:currentColor,pointRadius:4,fill:true,tension:0.35};
-  } else {
-    dataset={label:yKey,data:values,backgroundColor:labels.map(function(){return hexAlpha(currentColor,0.75);}),borderColor:currentColor,borderWidth:1,borderRadius:4};
-  }
+
+  var datasets=activeSeries.map(function(s){
+    var values=allRecords.map(function(r){return parseFloat(r[s.col])||0;});
+    if(isPie){
+      return {data:values,backgroundColor:PALETTE.slice(0,labels.length),borderColor:isDark?'#1e1e1c':'#fff',borderWidth:2};
+    } else if(currentType==='line'){
+      return {label:s.col,data:values,borderColor:s.color,backgroundColor:hexAlpha(s.color,0.1),borderWidth:2,pointBackgroundColor:s.color,pointRadius:4,fill:activeSeries.length===1,tension:0.35};
+    } else {
+      return {label:s.col,data:values,backgroundColor:labels.map(function(){return hexAlpha(s.color,0.75);}),borderColor:s.color,borderWidth:1,borderRadius:4};
+    }
+  });
+
+  buildChart(
+    isPie?'pie':(currentType==='line'?'line':'bar'),
+    labels, datasets, gridColor, labelColor, showLbls, hasDrill
+  );
+
+  setStatus('live',allRecords.length+' enregistrement'+(allRecords.length>1?'s':''));
+}
+
+function buildChart(type, labels, datasets, gridColor, labelColor, showLbls, hasDrill){
+  var isPie=type==='pie';
+  var titleVal=document.getElementById('chartTitleInput').value;
   var ctx=document.getElementById('chartCanvas').getContext('2d');
+
   chartInstance=new Chart(ctx,{
-    type:isPie?'pie':(currentType==='line'?'line':'bar'),
-    data:{labels:labels,datasets:[dataset]},
+    type:type,
+    data:{labels:labels,datasets:datasets},
     options:{
-      responsive:true,maintainAspectRatio:false,animation:{duration:250},
+      responsive:true,
+      maintainAspectRatio:false,
+      animation:{duration:250},
       plugins:{
-        legend:{display:isPie,position:'bottom',labels:{boxWidth:12,padding:14,font:{size:12},color:labelColor}},
+        title:{display:!!titleVal,text:titleVal,color:labelColor,font:{size:13,weight:'500'},padding:{bottom:10}},
+        legend:{
+          display:isPie||(datasets.length>1),
+          position:'bottom',
+          labels:{boxWidth:12,padding:14,font:{size:12},color:labelColor}
+        },
         tooltip:{callbacks:{label:function(c){
           var v=c.parsed.y!==undefined?c.parsed.y:c.parsed;
-          var base=' '+(Number.isInteger(v)?v:parseFloat(v.toFixed(2)));
-          return hasDrill?base+'  ↓ cliquer pour zoomer':base;
-        }}}
+          var base=' '+fmtVal(v);
+          return hasDrill?base+'  ↓ zoomer':base;
+        }}},
+        datalabels: showLbls ? {
+          display: true,
+          color: labelColor,
+          font: {size: 11},
+          formatter: function(v){ return fmtVal(v); },
+          anchor: isPie ? 'center' : 'end',
+          align: isPie ? 'center' : 'top',
+          offset: 4,
+          clamp: true
+        } : {display: false}
       },
       scales:isPie?{}:{
         x:{grid:{color:gridColor},ticks:{color:labelColor,font:{size:12},autoSkip:true,maxRotation:35}},
-        y:{grid:{color:gridColor},ticks:{color:labelColor,font:{size:12},callback:function(v){return Number.isInteger(v)?v:parseFloat(v.toFixed(2));}},title:{display:true,text:yKey,color:labelColor,font:{size:11}}}
+        y:{
+          grid:{color:gridColor},
+          ticks:{color:labelColor,font:{size:12},callback:function(v){return fmtVal(v);}},
+          title:{display:datasets.length===1,text:datasets[0]?datasets[0].label:'',color:labelColor,font:{size:11}}
+        }
       },
       onClick:hasDrill?function(evt,elements){
         if(!elements.length) return;
@@ -361,11 +555,10 @@ function renderChart(){
           chartInstance.update();
           setTimeout(function(){doDrill(clickedLabel);},320);
         } else {
-          chartInstance.data.datasets[0].backgroundColor=labels.map(function(l,i){
-            return i===idx?currentColor:hexAlpha(currentColor,0.2);
-          });
-          chartInstance.data.datasets[0].borderColor=labels.map(function(l,i){
-            return i===idx?currentColor:hexAlpha(currentColor,0.2);
+          datasets.forEach(function(ds,di){
+            chartInstance.data.datasets[di].backgroundColor=labels.map(function(l,i){
+              return i===idx?datasets[di].borderColor:hexAlpha(datasets[di].borderColor,0.2);
+            });
           });
           chartInstance.update();
           setTimeout(function(){doDrill(clickedLabel);},320);
@@ -373,9 +566,41 @@ function renderChart(){
       }:null
     }
   });
-  setStatus('live',allRecords.length+' enregistrement'+(allRecords.length>1?'s':''));
+
+  var h=isPie?300:datasets.length>1?320:280;
+  document.getElementById('chartWrapper').style.height=h+'px';
 }
 
+/* ---- EXPORT PNG ---- */
+function exportPNG(){
+  if(!chartInstance) return;
+  var a=document.createElement('a');
+  a.download=(document.getElementById('chartTitleInput').value||'graphique')+'.png';
+  a.href=document.getElementById('chartCanvas').toDataURL('image/png');
+  a.click();
+}
+
+/* ---- SAVE / LOAD OPTIONS ---- */
+function saveOpts(){
+  if(_saving) return;
+  _saving=true;
+  setTimeout(function(){
+    try{
+      grist.setOptions({
+        chartType:currentType,
+        xCol:document.getElementById('xAxis').value,
+        drillCol:document.getElementById('drillAxis').value,
+        valFormat:document.getElementById('valFormat').value,
+        showLabels:document.getElementById('showLabels').checked,
+        chartTitle:document.getElementById('chartTitleInput').value,
+        series:series
+      });
+    }catch(e){}
+    _saving=false;
+  },400);
+}
+
+/* ---- GRIST ---- */
 grist.ready({requiredAccess:'read table'});
 
 grist.onRecords(function(records){
@@ -383,20 +608,30 @@ grist.onRecords(function(records){
   allRecords=records;
   var cols=Object.keys(records[0]).filter(function(k){return k!=='id'&&k!=='manualSort';}).map(function(k){return {id:k,label:k};});
   if(cols.length!==columns.length||cols.map(function(c){return c.id;}).join()!==columns.map(function(c){return c.id;}).join()){
-    columns=cols;populateSelects(cols);
+    columns=cols;
+    populateSelects(cols);
   }
   setStatus('live',records.length+' enregistrement'+(records.length>1?'s':''));
-  if(!drillValue) renderChart();
+  if(!drillStack.length) renderChart();
 });
 
-grist.onOptions(function(options){
-  if(!options) return;
-  if(options.chartType){var btn=document.querySelector('[data-type="'+options.chartType+'"]');if(btn)setType(options.chartType,btn);}
-  if(options.color){currentColor=options.color;document.querySelectorAll('.color-swatch').forEach(function(s){s.classList.toggle('selected',s.dataset.color===options.color);});}
-  if(options.xCol)document.getElementById('xAxis').value=options.xCol;
-  if(options.yCol)document.getElementById('yAxis').value=options.yCol;
-  if(options.drillCol)document.getElementById('drillAxis').value=options.drillCol;
+grist.onOptions(function(opts){
+  if(!opts) return;
+  if(opts.chartType){
+    currentType=opts.chartType;
+    var btn=document.querySelector('[data-type="'+opts.chartType+'"]');
+    if(btn){document.querySelectorAll('.chart-btn').forEach(function(b){b.classList.remove('active');});btn.classList.add('active');}
+  }
+  if(opts.xCol) document.getElementById('xAxis').value=opts.xCol;
+  if(opts.drillCol) document.getElementById('drillAxis').value=opts.drillCol;
+  if(opts.valFormat) document.getElementById('valFormat').value=opts.valFormat;
+  if(typeof opts.showLabels==='boolean') document.getElementById('showLabels').checked=opts.showLabels;
+  if(opts.chartTitle) document.getElementById('chartTitleInput').value=opts.chartTitle;
+  if(opts.series&&opts.series.length){series=opts.series;renderSeriesList();}
+  renderChart();
 });
+
+renderSeriesList();
 </script>
 </body>
 </html>
