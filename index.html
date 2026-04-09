@@ -487,7 +487,14 @@ function renderChart(){
   if(!allRecords.length){showEmpty('Aucune donnée reçue de Grist…');return;}
   if(!xKey||!activeSeries.length){showEmpty('Configurez l\'axe X et au moins une série Y');return;}
 
-  var labels=allRecords.map(function(r){return String(r[xKey]!==undefined?r[xKey]:'');});
+  // Agréger par valeur X (somme des Y pour chaque catégorie)
+  var groupIndex={};
+  var labels=[];
+  allRecords.forEach(function(r){
+    var k=String(r[xKey]!==undefined?r[xKey]:'');
+    if(groupIndex[k]===undefined){groupIndex[k]=labels.length;labels.push(k);}
+  });
+
   var hasDrill=!!drillKey&&(currentType==='bar'||currentType==='pie');
 
   document.getElementById('emptyState').style.display='none';
@@ -501,7 +508,12 @@ function renderChart(){
   var labelColor=isDark?'#a8a8a3':'#6b6b67';
 
   var datasets=activeSeries.map(function(s){
-    var values=allRecords.map(function(r){return parseFloat(r[s.col])||0;});
+    var values=new Array(labels.length).fill(0);
+    allRecords.forEach(function(r){
+      var k=String(r[xKey]!==undefined?r[xKey]:'');
+      var idx=groupIndex[k];
+      values[idx]+=(parseFloat(r[s.col])||0);
+    });
     if(isPie){
       return {data:values,backgroundColor:PALETTE.slice(0,labels.length),borderColor:isDark?'#1e1e1c':'#fff',borderWidth:2};
     } else if(currentType==='line'){
